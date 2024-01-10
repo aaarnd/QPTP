@@ -8,6 +8,7 @@ from decimal import Decimal, InvalidOperation
 score_data = []
 data = []
 placed = []
+urls = []
 
 
 class MainWindow(QMainWindow):
@@ -70,6 +71,10 @@ class MainWindow(QMainWindow):
 
     def parse(self):
         url = self.url_input.text()
+        if url in urls:
+            print('Данная страница уже парсилась.')
+            return
+        urls.append(url)
         response = requests.get(url)
         soup = BeautifulSoup(response.text, 'html.parser')
         table = soup.find('table', {'class': 'game-table'})
@@ -88,7 +93,7 @@ class MainWindow(QMainWindow):
         cells = second_row.find_all('td')
         count = 0
         for i, cell in enumerate(cells):
-            if cell.text.strip():
+            if cell.text.strip():  
                 try:
                     value = Decimal(cell.text.strip())
                     if max_numeric_value is None or value > max_numeric_value:
@@ -97,6 +102,32 @@ class MainWindow(QMainWindow):
                 except (ValueError, InvalidOperation):
                     count += 1
                     continue
+
+        placed_rows = table.find_all('tr')
+        for i in range(1,4):
+            cells = placed_rows[i].find_all('td')
+            place_placed = int(cells[0].text.strip())
+            if (len(cells) > 11):
+                team_name = cells[3].text.strip()
+            else:
+                team_name = cells[2].text.strip()
+            team = (team_name, 0, 0, 0)
+            team_list = list(team)
+            team_list[place_placed] += 1
+            team = tuple(team_list)
+
+            found = False
+            for i, (existing_name, first, second, third) in enumerate(placed):
+                if team_name == existing_name:
+                    team_list = list(placed[i])
+                    team_list[place_placed] += 1
+                    placed[i] = tuple(team_list)
+                    found = True
+                    break
+
+            if not found:
+                placed.append(team)
+
 
         for row in rows[1:]:
             cells = row.find_all('td')
@@ -150,13 +181,11 @@ class MainWindow(QMainWindow):
                                                     options=options)
 
         if excel_file:
-            try:
-
+            try:        
                 df = pd.read_excel(excel_file, dtype={'Количество баллов': float})
 
                 imported_data = df[['Имя команды', 'Количество баллов']].values
-                for name, score in imported_data:
-                
+                for name, score in imported_data:                   
                     if pd.notna(name) and pd.notna(score):
                         score_data.append((name, score))
 
@@ -167,6 +196,8 @@ class MainWindow(QMainWindow):
     def remove_data(self):
         score_data.clear()
         data.clear()
+        placed.clear()
+        urls.clear()
         print("Данные успешно очищены.")
 
 
